@@ -161,12 +161,21 @@ const statusType = (s) => ({
   '已开票': 'success', '已交货': 'warning', '未交货': 'info'
 }[s] || 'primary')
 
-// 采购员颜色映射
-const buyerColors = {
-  '文旭': '#409EFF', '沈薇': '#67c23a', '熊佳新': '#e6a23c',
-  '谭谭': '#f56c6c', '陈民': '#909399', '李赛': '#b37feb'
+// 采购员颜色映射 - 自动生成
+const buyerColorPalette = [
+  '#409EFF', '#67c23a', '#e6a23c', '#f56c6c', '#909399', '#b37feb',
+  '#13c2c2', '#eb2f96', '#fa8c16', '#52c41a', '#722ed1', '#2f54eb'
+]
+const buyerColorMap = {}
+let colorIndex = 0
+const buyerColor = (name) => {
+  if (!name) return '#c0c4cc'
+  if (!buyerColorMap[name]) {
+    buyerColorMap[name] = buyerColorPalette[colorIndex % buyerColorPalette.length]
+    colorIndex++
+  }
+  return buyerColorMap[name]
 }
-const buyerColor = (name) => buyerColors[name] || '#c0c4cc'
 
 const progressColor = (pct) => {
   if (pct >= 100) return '#67c23a'

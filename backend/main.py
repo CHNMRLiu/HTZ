@@ -14,7 +14,7 @@ from auth import (
     get_current_user, get_admin_user
 )
 
-app = FastAPI(title="HTZ 合同台账系统", version="1.1.0")
+app = FastAPI(title="HTZ 合同台账系统", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
