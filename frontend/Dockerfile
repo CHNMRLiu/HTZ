@@ -1,12 +1,26 @@
-FROM node:22-slim
+# 构建阶段
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm install
 
-COPY frontend/ .
+COPY . .
+RUN npm run build
 
-EXPOSE 5670
+# 运行阶段 - 使用nginx
+FROM nginx:alpine
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5670"]
+# 删除默认配置
+RUN rm /etc/nginx/conf.d/default.conf
+
+# 复制自定义nginx配置
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# 复制构建产物
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]

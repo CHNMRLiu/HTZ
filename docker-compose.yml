@@ -1,16 +1,23 @@
 services:
   backend:
     build: ./backend
+    container_name: htz-backend
     ports:
       - "5671:5671"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5671/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   frontend:
     build: ./frontend
+    container_name: htz-frontend
     ports:
-      - "5670:5670"
+      - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
