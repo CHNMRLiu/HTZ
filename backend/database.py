@@ -77,6 +77,8 @@ class Invoice(Base):
     contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True, comment="关联合同")
     seller = Column(String(100), comment="销售方")
     file_path = Column(String(255), comment="PDF文件路径")
+    attachment_path = Column(String(255), comment="附件路径")
+    attachment_name = Column(String(255), comment="附件原始文件名")
     created_at = Column(DateTime, default=datetime.now)
     
     contract = relationship("Contract", back_populates="invoices")

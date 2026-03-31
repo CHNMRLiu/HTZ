@@ -14,7 +14,7 @@ from auth import (
     get_current_user, get_admin_user
 )
 
-app = FastAPI(title="HTZ 合同台账系统", version="1.0.0")
+app = FastAPI(title="HTZ 合同台账系统", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -384,6 +384,8 @@ class InvoiceCreate(BaseModel):
     tax_amount: Optional[float] = None
     contract_id: Optional[int] = None
     seller: Optional[str] = None
+    attachment_path: Optional[str] = None
+    attachment_name: Optional[str] = None
 
 
 @app.get("/api/invoices")
@@ -412,7 +414,8 @@ def list_invoices(
         "items": [{
             "id": i.id, "invoice_no": i.invoice_no, "invoice_date": i.invoice_date,
             "amount": i.amount, "tax_amount": i.tax_amount,
-            "contract_id": i.contract_id, "seller": i.seller, "file_path": i.file_path
+            "contract_id": i.contract_id, "seller": i.seller, "file_path": i.file_path,
+            "attachment_path": i.attachment_path, "attachment_name": i.attachment_name
         } for i in items]
     }
 
@@ -452,13 +455,36 @@ def delete_invoice(invoice_id: int, current_user: User = Depends(get_current_use
 @app.post("/api/invoices/upload")
 async def upload_invoice_pdf(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    invoice_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    filename = file.filename
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    # 创建发票附件专用目录
+    attach_dir = os.path.join(UPLOAD_DIR, "invoice_attachments")
+    os.makedirs(attach_dir, exist_ok=True)
+    
+    # 用发票号或时间戳命名，避免冲突
+    original_name = file.filename or "attachment.pdf"
+    if invoice_id:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice:
+            safe_name = f"{invoice.invoice_no}_{original_name}"
+            # 更新发票记录的附件信息
+            filepath = os.path.join(attach_dir, safe_name)
+            with open(filepath, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            invoice.attachment_path = f"/uploads/invoice_attachments/{safe_name}"
+            invoice.attachment_name = original_name
+            db.commit()
+            return {"msg": "上传成功", "path": invoice.attachment_path, "name": original_name}
+    
+    # 无invoice_id时，用时间戳命名
+    import time
+    safe_name = f"{int(time.time())}_{original_name}"
+    filepath = os.path.join(attach_dir, safe_name)
     with open(filepath, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    return {"msg": "上传成功", "path": f"/uploads/{filename}"}
+    return {"msg": "上传成功", "path": f"/uploads/invoice_attachments/{safe_name}", "name": original_name}
 
 
 # ==================== 导入导出 ====================
