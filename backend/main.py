@@ -14,7 +14,7 @@ from auth import (
     get_current_user, get_admin_user
 )
 
-app = FastAPI(title="HTZ 合同台账系统", version="1.2.0")
+app = FastAPI(title="HTZ 合同台账系统", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -97,11 +97,18 @@ def list_users(admin: User = Depends(get_admin_user), db: Session = Depends(get_
 class ContractCreate(BaseModel):
     seq: Optional[int] = None
     contract_no: str
+    contract_type: str = "采购"
     sign_date: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
     amount: Optional[float] = None
     purchase_amount: Optional[float] = 0
+    tax_rate: Optional[float] = 0
     status: str = "进行中"
     buyer: Optional[str] = None
+    department: Optional[str] = None
+    party_a: Optional[str] = None
+    party_b: Optional[str] = None
     content: Optional[str] = None
     invoice_info: Optional[str] = None
     order_progress: Optional[float] = 0
@@ -137,8 +144,13 @@ def list_contracts(
         "total": total,
         "items": [{
             "id": c.id, "seq": c.seq, "contract_no": c.contract_no,
-            "sign_date": c.sign_date, "amount": c.amount, "purchase_amount": c.purchase_amount or 0,
-            "status": c.status, "buyer": c.buyer, "content": c.content, "invoice_info": c.invoice_info,
+            "contract_type": c.contract_type or "采购",
+            "sign_date": c.sign_date, "start_date": c.start_date, "end_date": c.end_date,
+            "amount": c.amount, "purchase_amount": c.purchase_amount or 0,
+            "tax_rate": c.tax_rate or 0,
+            "status": c.status, "buyer": c.buyer, "department": c.department,
+            "party_a": c.party_a, "party_b": c.party_b,
+            "content": c.content, "invoice_info": c.invoice_info,
             "order_progress": c.order_progress or 0, "delivery_progress": c.delivery_progress or 0
         } for c in items]
     }
@@ -162,9 +174,13 @@ def get_contract(contract_id: int, current_user: User = Depends(get_current_user
         raise HTTPException(status_code=404, detail="合同不存在")
     return {
         "id": contract.id, "seq": contract.seq, "contract_no": contract.contract_no,
-        "sign_date": contract.sign_date, "amount": contract.amount, "purchase_amount": contract.purchase_amount or 0,
-        "status": contract.status, "buyer": contract.buyer, "content": contract.content,
-        "invoice_info": contract.invoice_info,
+        "contract_type": contract.contract_type or "采购",
+        "sign_date": contract.sign_date, "start_date": contract.start_date, "end_date": contract.end_date,
+        "amount": contract.amount, "purchase_amount": contract.purchase_amount or 0,
+        "tax_rate": contract.tax_rate or 0,
+        "status": contract.status, "buyer": contract.buyer, "department": contract.department,
+        "party_a": contract.party_a, "party_b": contract.party_b,
+        "content": contract.content, "invoice_info": contract.invoice_info,
         "order_progress": contract.order_progress or 0, "delivery_progress": contract.delivery_progress or 0,
         "items": [{
             "id": i.id, "item_no": i.item_no, "material_code": i.material_code,
@@ -363,11 +379,11 @@ def download_contract_template():
     ws = wb.active
     ws.title = "合同导入模板"
     
-    headers = ["序号", "供应合同号", "签订日期", "合同金额", "采购金额", "合同状态", "采购员", "合同内容", "开票信息"]
+    headers = ["序号", "供应合同号", "合同类型", "签订日期", "履约开始日", "到期日期", "合同金额", "采购金额", "税率%", "合同状态", "采购员", "归属部门", "甲方", "乙方", "合同内容", "开票信息"]
     ws.append(headers)
-    ws.append([1, "2501CBHW0001", "2025.1.1", 10000, 8000, "进行中", "文旭", "示例合同内容", ""])
+    ws.append([1, "2501CBHW0001", "采购", "2025.1.1", "2025.1.1", "2025.12.31", 10000, 8000, 13, "进行中", "文旭", "生产部", "长沙水泵厂", "供应商", "示例合同内容", ""])
     for i in range(1, len(headers)+1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 20
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 18
     
     filepath = os.path.join(UPLOAD_DIR, "template_contracts.xlsx")
     wb.save(filepath)
@@ -569,11 +585,11 @@ def export_contracts(
     ws = wb.active
     ws.title = "合同台账"
     
-    headers = ["序号", "供应合同号", "签订日期", "合同金额", "采购金额", "合同状态", "采购员", "合同内容", "开票信息", "订货进度%", "交货进度%"]
+    headers = ["序号", "供应合同号", "合同类型", "签订日期", "履约开始日", "到期日期", "合同金额", "采购金额", "税率%", "合同状态", "采购员", "归属部门", "甲方", "乙方", "合同内容", "开票信息", "订货进度%", "交货进度%"]
     ws.append(headers)
     
     for c in contracts:
-        ws.append([c.seq, c.contract_no, c.sign_date, c.amount, c.purchase_amount or 0, c.status, c.buyer, c.content, c.invoice_info, c.order_progress or 0, c.delivery_progress or 0])
+        ws.append([c.seq, c.contract_no, c.contract_type or "采购", c.sign_date, c.start_date, c.end_date, c.amount, c.purchase_amount or 0, c.tax_rate or 0, c.status, c.buyer, c.department, c.party_a, c.party_b, c.content, c.invoice_info, c.order_progress or 0, c.delivery_progress or 0])
     
     filepath = os.path.join(UPLOAD_DIR, "export_contracts.xlsx")
     wb.save(filepath)

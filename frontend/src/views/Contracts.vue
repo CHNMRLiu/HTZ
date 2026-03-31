@@ -30,21 +30,36 @@
       </div>
 
       <el-table :data="list" stripe v-loading="loading" class="data-table"
-        :header-cell-style="{ background: '#fafafa', color: '#303133', fontWeight: 600 }">
+        :header-cell-style="{ background: '#fafafa', color: '#303133', fontWeight: 600 }"
+        :row-class-name="tableRowClassName">
         <el-table-column prop="seq" label="序号" width="70" align="center" />
         <el-table-column prop="contract_no" label="合同号" width="160">
           <template #default="{ row }">
             <span class="contract-no-link" @click="$router.push(`/contracts/${row.id}`)">{{ row.contract_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sign_date" label="签订日期" width="110" />
+        <el-table-column prop="contract_type" label="类型" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="typeTag(row.contract_type)">{{ row.contract_type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sign_date" label="签订日期" width="100" />
+        <el-table-column label="到期日期" width="100">
+          <template #default="{ row }">
+            <span :class="{ 'expire-warning': isExpiring(row.end_date), 'expired': isExpired(row.end_date) }">
+              {{ row.end_date || '-' }}
+              <el-icon v-if="isExpired(row.end_date)"><WarningFilled /></el-icon>
+              <el-icon v-else-if="isExpiring(row.end_date)"><Bell /></el-icon>
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="amount" label="销售金额" width="130" align="right">
           <template #default="{ row }"><span class="sales-text">¥{{ fm(row.amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="purchase_amount" label="采购金额" width="130" align="right">
           <template #default="{ row }"><span class="purchase-text">¥{{ fm(row.purchase_amount) }}</span></template>
         </el-table-column>
-        <el-table-column label="利润" width="120" align="right">
+        <el-table-column label="利润" width="110" align="right">
           <template #default="{ row }">
             <span :class="(row.amount||0) - (row.purchase_amount||0) >= 0 ? 'profit-positive' : 'profit-negative'">
               ¥{{ fm((row.amount||0) - (row.purchase_amount||0)) }}
@@ -56,22 +71,22 @@
             <el-tag :type="statusType(row.status)" size="small" effect="light" round>{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="buyer" label="采购员" width="90" align="center">
+        <el-table-column prop="buyer" label="采购员" width="80" align="center">
           <template #default="{ row }">
             <span v-if="row.buyer" class="buyer-tag" :style="{ background: buyerColor(row.buyer) }">{{ row.buyer }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="订货进度" width="120" align="center">
+        <el-table-column prop="department" label="部门" width="80" align="center" />
+        <el-table-column label="进度" width="140" align="center">
           <template #default="{ row }">
-            <el-progress :percentage="row.order_progress || 0" :stroke-width="8" :color="progressColor(row.order_progress)" :format="(p) => p + '%'" />
+            <div class="progress-cell">
+              <span class="progress-label">订{{ row.order_progress || 0 }}%</span>
+              <el-progress :percentage="row.order_progress || 0" :stroke-width="6" :show-text="false" :color="progressColor(row.order_progress)" />
+              <span class="progress-label">交{{ row.delivery_progress || 0 }}%</span>
+              <el-progress :percentage="row.delivery_progress || 0" :stroke-width="6" :show-text="false" :color="progressColor(row.delivery_progress)" />
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="交货进度" width="120" align="center">
-          <template #default="{ row }">
-            <el-progress :percentage="row.delivery_progress || 0" :stroke-width="8" :color="progressColor(row.delivery_progress)" :format="(p) => p + '%'" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="content" label="合同内容" show-overflow-tooltip min-width="180" />
         <el-table-column label="操作" width="150" fixed="right" align="center">
           <template #default="{ row }">
             <div class="action-btns">
@@ -100,33 +115,67 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="editId ? '编辑合同' : '新增合同'" width="700px" destroy-on-close>
-      <el-form :model="form" label-width="100px" class="dialog-form">
-        <el-row :gutter="20">
+    <el-dialog v-model="dialogVisible" :title="editId ? '编辑合同' : '新增合同'" width="800px" destroy-on-close>
+      <el-form :model="form" label-width="90px" class="dialog-form">
+        <el-row :gutter="16">
           <el-col :span="8"><el-form-item label="序号"><el-input-number v-model="form.seq" :min="1" style="width:100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="合同号"><el-input v-model="form.contract_no" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="签订日期"><el-input v-model="form.sign_date" placeholder="如: 2025.1.3" /></el-form-item></el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8"><el-form-item label="销售金额"><el-input-number v-model="form.amount" :precision="2" :min="0" style="width:100%" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="采购金额"><el-input-number v-model="form.purchase_amount" :precision="2" :min="0" style="width:100%" /></el-form-item></el-col>
           <el-col :span="8">
-            <el-form-item label="合同状态">
-              <el-select v-model="form.status" style="width:100%">
-                <el-option label="进行中" value="进行中" />
-                <el-option label="待开票" value="待开票" />
-                <el-option label="待回款" value="待回款" />
-                <el-option label="已完结" value="已完结" />
+            <el-form-item label="合同类型">
+              <el-select v-model="form.contract_type" style="width:100%">
+                <el-option label="采购" value="采购" /><el-option label="销售" value="销售" />
+                <el-option label="劳务" value="劳务" /><el-option label="其他" value="其他" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8"><el-form-item label="采购员"><el-input v-model="form.buyer" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="订货进度%"><el-input-number v-model="form.order_progress" :min="0" :max="100" style="width:100%" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="交货进度%"><el-input-number v-model="form.delivery_progress" :min="0" :max="100" style="width:100%" /></el-form-item></el-col>
+        <el-row :gutter="16">
+          <el-col :span="8"><el-form-item label="签订日期"><el-input v-model="form.sign_date" placeholder="2025.1.3" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="履约开始"><el-input v-model="form.start_date" placeholder="2025.1.3" /></el-form-item></el-col>
+          <el-col :span="8">
+            <el-form-item label="到期日期">
+              <el-input v-model="form.end_date" placeholder="2025.12.31">
+                <template #suffix>
+                  <el-icon v-if="isExpired(form.end_date)" style="color:#f56c6c"><WarningFilled /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
         </el-row>
-        <el-form-item label="合同内容"><el-input v-model="form.content" type="textarea" :rows="2" /></el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="8"><el-form-item label="销售金额"><el-input-number v-model="form.amount" :precision="2" :min="0" style="width:100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="采购金额"><el-input-number v-model="form.purchase_amount" :precision="2" :min="0" style="width:100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="税率%"><el-input-number v-model="form.tax_rate" :precision="2" :min="0" :max="100" style="width:100%" /></el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="合同状态">
+              <el-select v-model="form.status" style="width:100%">
+                <el-option label="进行中" value="进行中" /><el-option label="待开票" value="待开票" />
+                <el-option label="待回款" value="待回款" /><el-option label="已完结" value="已完结" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8"><el-form-item label="采购员"><el-input v-model="form.buyer" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="归属部门"><el-input v-model="form.department" /></el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8"><el-form-item label="甲方"><el-input v-model="form.party_a" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="乙方"><el-input v-model="form.party_b" /></el-form-item></el-col>
+          <el-col :span="8">
+            <el-form-item label="订货进度%">
+              <el-input-number v-model="form.order_progress" :min="0" :max="100" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="交货进度%">
+              <el-input-number v-model="form.delivery_progress" :min="0" :max="100" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="16"><el-form-item label="合同内容"><el-input v-model="form.content" type="textarea" :rows="2" /></el-form-item></el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取 消</el-button>
@@ -139,7 +188,7 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Upload, Download, Search, List, Edit, Delete, Document } from '@element-plus/icons-vue'
+import { Plus, Upload, Download, Search, List, Edit, Delete, Document, WarningFilled, Bell } from '@element-plus/icons-vue'
 import api from '../api'
 
 const list = ref([])
@@ -150,18 +199,45 @@ const dialogVisible = ref(false)
 const editId = ref(null)
 const query = reactive({ keyword: '', status: '', page: 1 })
 const form = reactive({
-  seq: null, contract_no: '', sign_date: '', amount: null, purchase_amount: 0,
-  status: '进行中', buyer: '', content: '', invoice_info: '', order_progress: 0, delivery_progress: 0
+  seq: null, contract_no: '', contract_type: '采购',
+  sign_date: '', start_date: '', end_date: '',
+  amount: null, purchase_amount: 0, tax_rate: 0,
+  status: '进行中', buyer: '', department: '',
+  party_a: '', party_b: '', content: '', invoice_info: '',
+  order_progress: 0, delivery_progress: 0
 })
 
 const fm = (v) => (v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
 
 const statusType = (s) => ({
-  '进行中': 'primary', '待开票': 'warning', '待回款': 'info', '已完结': 'success',
-  '已开票': 'success', '已交货': 'warning', '未交货': 'info'
+  '进行中': 'primary', '待开票': 'warning', '待回款': 'info', '已完结': 'success'
 }[s] || 'primary')
 
-// 采购员颜色映射 - 自动生成
+const typeTag = (t) => ({
+  '采购': '', '销售': 'success', '劳务': 'warning', '其他': 'info'
+}[t] || '')
+
+// 到期提醒
+const isExpired = (end) => {
+  if (!end) return false
+  const d = new Date(end.replace(/\./g, '-'))
+  return !isNaN(d) && d < new Date()
+}
+const isExpiring = (end) => {
+  if (!end) return false
+  const d = new Date(end.replace(/\./g, '-'))
+  if (isNaN(d)) return false
+  const diff = (d - new Date()) / (1000 * 60 * 60 * 24)
+  return diff > 0 && diff <= 30
+}
+
+const tableRowClassName = ({ row }) => {
+  if (isExpired(row.end_date)) return 'row-expired'
+  if (isExpiring(row.end_date)) return 'row-expiring'
+  return ''
+}
+
+// 采购员颜色自动生成
 const buyerColorPalette = [
   '#409EFF', '#67c23a', '#e6a23c', '#f56c6c', '#909399', '#b37feb',
   '#13c2c2', '#eb2f96', '#fa8c16', '#52c41a', '#722ed1', '#2f54eb'
@@ -196,8 +272,12 @@ const loadData = async () => {
 const showDialog = (row) => {
   editId.value = row?.id || null
   Object.assign(form, row || {
-    seq: null, contract_no: '', sign_date: '', amount: null, purchase_amount: 0,
-    status: '进行中', buyer: '', content: '', invoice_info: '', order_progress: 0, delivery_progress: 0
+    seq: null, contract_no: '', contract_type: '采购',
+    sign_date: '', start_date: '', end_date: '',
+    amount: null, purchase_amount: 0, tax_rate: 0,
+    status: '进行中', buyer: '', department: '',
+    party_a: '', party_b: '', content: '', invoice_info: '',
+    order_progress: 0, delivery_progress: 0
   })
   dialogVisible.value = true
 }
@@ -255,19 +335,23 @@ onMounted(loadData)
 .filter-select { width: 140px; }
 .data-table { border-radius: 8px; overflow: hidden; }
 
+/* 到期提醒样式 */
+.expire-warning { color: #e6a23c; font-weight: 600; }
+.expired { color: #f56c6c; font-weight: 600; }
+
+/* 行样式 */
+:deep(.row-expired) { background: #fef0f0 !important; }
+:deep(.row-expiring) { background: #fdf6ec !important; }
+
 .contract-no-link { color: #409EFF; font-weight: 600; cursor: pointer; transition: all 0.2s; border-bottom: 1px dashed transparent; }
 .contract-no-link:hover { color: #337ecc; border-bottom-color: #337ecc; }
-
 .sales-text { color: #67c23a; font-weight: 600; font-variant-numeric: tabular-nums; }
 .purchase-text { color: #e6a23c; font-weight: 600; font-variant-numeric: tabular-nums; }
 .profit-positive { color: #67c23a; font-weight: 600; }
 .profit-negative { color: #f56c6c; font-weight: 600; }
-
-.buyer-tag {
-  display: inline-block; padding: 2px 10px; border-radius: 12px;
-  color: #fff; font-size: 12px; font-weight: 500;
-}
-
+.buyer-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; color: #fff; font-size: 12px; font-weight: 500; }
+.progress-cell { display: flex; flex-direction: column; gap: 2px; }
+.progress-label { font-size: 10px; color: #909399; }
 .action-btns { display: flex; gap: 6px; justify-content: center; }
 .action-btns .el-button { margin-left: 0; }
 .pagination-wrapper { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
