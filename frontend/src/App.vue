@@ -20,10 +20,11 @@
   --text-secondary: #909399;
   --bg-color: #f0f2f5;
   --sidebar-bg: #1d1e2c;
-  --sidebar-hover: #262842;
+  --sidebar-hover: rgba(255,255,255,0.08);
   --sidebar-active: #409EFF;
   --header-bg: #fff;
   --card-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.06);
+  --border-radius: 12px;
 }
 
 * {
@@ -37,6 +38,7 @@ html, body, #app {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-color);
 }
 
 ::-webkit-scrollbar {
@@ -49,5 +51,28 @@ html, body, #app {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* 全局过渡 */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+.slide-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+.slide-fade-enter-from {
+  transform: translateY(10px);
+  opacity: 0;
+}
+.slide-fade-leave-to {
+  transform: translateY(-10px);
+  opacity: 0;
 }
 </style>

@@ -2,3 +2,5 @@ data/
 *.db
 node_modules/
 data/uploads/
+__pycache__/
+dist/
